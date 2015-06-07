@@ -1,0 +1,49 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black"
+    tools:context=".MainActivity" >
+
+    <ImageView
+        android:id="@+id/ConnectionStatIcon"
+        android:layout_width="10dp"
+        android:layout_height="10dp"
+        android:layout_marginLeft="300dp"
+        android:layout_marginTop="15dp"
+        android:src="@drawable/circle_green" />
+
+    <TextView
+        android:id="@+id/ConnectionTextStat"
+        android:textColor="@android:color/white"
+        android:layout_marginTop="10dp"
+        android:layout_width="300dp"
+        android:layout_height="20dp"
+        android:text="@string/ConnectionStat" />
+
+
+    <com.jjoe64.graphview.GraphView
+        android:layout_marginTop="30dp"
+        android:layout_width="match_parent"
+        android:layout_height="120dip"
+        android:id="@+id/graph1" />
+
+    <com.jjoe64.graphview.GraphView
+        android:layout_marginTop="150dp"
+        android:layout_width="match_parent"
+        android:layout_height="120dip"
+        android:id="@+id/graph2" />
+
+    <com.jjoe64.graphview.GraphView
+        android:layout_marginTop="260dp"
+        android:layout_width="match_parent"
+        android:layout_height="120dip"
+        android:id="@+id/graph3" />
+
+    <com.jjoe64.graphview.GraphView
+        android:layout_marginTop="370dp"
+        android:layout_width="match_parent"
+        android:layout_height="120dip"
+        android:id="@+id/graph4" />
+
+</RelativeLayout>

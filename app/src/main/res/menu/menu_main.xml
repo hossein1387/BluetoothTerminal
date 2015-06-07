@@ -1,0 +1,12 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android" >
+
+    <item android:id="@+id/connect"
+        android:icon="@android:drawable/ic_menu_search"
+        android:title="@string/connect" />
+
+    <item android:id="@+id/Settings"
+        android:icon="@android:drawable/ic_menu_preferences"
+        android:title="@string/Settings" />
+
+
+</menu>
