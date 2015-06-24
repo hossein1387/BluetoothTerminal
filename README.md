@@ -1,5 +1,6 @@
-# BluetoothTerminal
-You can monitor sensor data through  Bluetooth socket.
+# Bluetooth Sensor Terminal
+Using this android app, you can monitor sensor data from your android device!
+Also, it is possible to store the data in your DropBox account.
 
 
 ![](https://dl.dropboxusercontent.com/s/h2zjvyhys9eqdzq/0.png?)
