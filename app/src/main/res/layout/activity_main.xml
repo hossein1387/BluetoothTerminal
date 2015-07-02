@@ -5,45 +5,31 @@
     android:background="@android:color/black"
     tools:context=".MainActivity" >
 
-    <ImageView
-        android:id="@+id/ConnectionStatIcon"
-        android:layout_width="10dp"
-        android:layout_height="10dp"
-        android:layout_marginLeft="300dp"
-        android:layout_marginTop="15dp"
-        android:src="@drawable/circle_green" />
 
-    <TextView
-        android:id="@+id/ConnectionTextStat"
-        android:textColor="@android:color/white"
-        android:layout_marginTop="10dp"
-        android:layout_width="300dp"
-        android:layout_height="20dp"
-        android:text="@string/ConnectionStat" />
+    <ScrollView
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:layout_weight="1" >
+        <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+            android:orientation="vertical"
+            android:layout_weight="1">
+            <TextView
+                android:id="@+id/ConnectionTextStat"
+                android:textColor="@android:color/white"
+                android:layout_marginTop="0dp"
+                android:layout_width="280dp"
+                android:layout_height="20dp"
+                android:text="@string/ConnectionStat" />
 
+            <com.jjoe64.graphview.GraphView
+                android:layout_marginTop="30dp"
+                android:layout_width="match_parent"
+                android:layout_height="420dip"
+                android:id="@+id/graph1" />
 
-    <com.jjoe64.graphview.GraphView
-        android:layout_marginTop="30dp"
-        android:layout_width="match_parent"
-        android:layout_height="120dip"
-        android:id="@+id/graph1" />
-
-    <com.jjoe64.graphview.GraphView
-        android:layout_marginTop="150dp"
-        android:layout_width="match_parent"
-        android:layout_height="120dip"
-        android:id="@+id/graph2" />
-
-    <com.jjoe64.graphview.GraphView
-        android:layout_marginTop="260dp"
-        android:layout_width="match_parent"
-        android:layout_height="120dip"
-        android:id="@+id/graph3" />
-
-    <com.jjoe64.graphview.GraphView
-        android:layout_marginTop="370dp"
-        android:layout_width="match_parent"
-        android:layout_height="120dip"
-        android:id="@+id/graph4" />
+        </LinearLayout>
+    </ScrollView>
 
 </RelativeLayout>

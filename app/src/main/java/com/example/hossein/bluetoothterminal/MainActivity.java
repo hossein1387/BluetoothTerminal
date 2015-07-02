@@ -8,10 +8,11 @@ import android.view.Menu;
 import android.view.MenuItem;
 import java.io.File;
 import android.view.MenuInflater;
+
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -22,16 +23,19 @@ import android.os.Message;
 import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothSocket;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.view.View;
-import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.content.Context;
+
+import com.dropbox.client2.DropboxAPI;
+import com.dropbox.client2.android.AndroidAuthSession;
+import com.dropbox.client2.exception.DropboxException;
+import com.dropbox.client2.exception.DropboxUnlinkedException;
+import com.dropbox.client2.session.AppKeyPair;
 import com.jjoe64.graphview.GraphView;
 import com.jjoe64.graphview.LegendRenderer;
 import com.jjoe64.graphview.Viewport;
@@ -43,25 +47,14 @@ import com.jjoe64.graphview.series.LineGraphSeries;
 public class MainActivity extends Activity {
 //==============================================================================
 // Variables:
-    public static final int NumberOfSamplesPerUpload = 1000;
-    public int SampleCounter = 0;
-    public static final byte NewLineChar = 13;
-    private Handler handler = new Handler();
+    public int sampleCounter = 0;
     private BluetoothAdapter mBluetoothAdapter = null;
     private boolean mEnablingBT;
-    public int RecData = 0;
-    public String toastText = "";
-    public String recData="";
-    public byte[] DataBuffer = new byte[1024];
-    BluetoothSocket mmSocket;
-    OutputStream mmOutputStream;
-    int dataCount = 1;
     public boolean ConnectGreenIconVIS= true; // Connect circle button visibility
     private static BluetoothSerialService mSerialService = null;
     // Intent request codes
     private static final int REQUEST_CONNECT_DEVICE = 1;
     private static final int REQUEST_ENABLE_BT = 2;
-    private static final int AUTH_REQUEST = 3;
     // Activity Result Keys
     public static final int MESSAGE_STATE_CHANGE = 1;
     public static final int MESSAGE_READ = 2;
@@ -73,15 +66,18 @@ public class MainActivity extends Activity {
     // Key names received from the BluetoothChatService Handler
     public static final String DEVICE_NAME = "device_name";
     public static final String TOAST = "toast";
-    private MenuItem mMenuItemConnect,mMenuItemClearGraph;
+    private MenuItem mMenuItemConnect;
     // Name of the connected device
     private String mConnectedDeviceName = null;
     // Storage File
     File folder,DataFile;
     String DataFileName = "DataFile.txt";
-    //BOX Variables
-    private boolean authentication = false,DoneUploading=true,mIsBound,SyncData=true;;
-    public int FileUploadedToBox=0;
+    //DropBOX Variables
+    final static private String APP_KEY = "*******";
+    final static private String APP_SECRET = "*******";
+    private DropboxAPI<AndroidAuthSession> mDBApi;
+    final static private int numberOfSamples = 100;
+//    File fileTobeUploaded = new File("working-draft.txt");
 
     //GraphView Vars:
     private double graph2LastXValue = 5d;
@@ -101,11 +97,9 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        ImageView ConnectedImg = (ImageView) findViewById(R.id.ConnectionStatIcon);
         TextView ConnectionStat = (TextView) findViewById(R.id.ConnectionTextStat);
-        ConnectedImg.setVisibility(View.GONE);
         ConnectionStat.setText("Not Connected");
-        handler.postDelayed(runnable, 100);
+        ConnectionStat.setTextColor(Color.RED);
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         mSerialService = new BluetoothSerialService(this, mHandlerBT);
         if (mBluetoothAdapter == null) {
@@ -115,7 +109,6 @@ public class MainActivity extends Activity {
         folder = getExternalFilesDir("BlueToothTerminal");
         DataFile = new File(folder,DataFileName);
         if (DataFile.exists()){
-            DataFile.delete();
             DataFile = new File(folder,DataFileName);
         }
         Log.e("DataStorage", DataFile.getAbsolutePath());
@@ -125,6 +118,10 @@ public class MainActivity extends Activity {
         }
         else{
             Toast.makeText(this, "Internet Connection Found!", Toast.LENGTH_LONG).show();
+            AppKeyPair appKeys = new AppKeyPair(APP_KEY, APP_SECRET);
+            AndroidAuthSession session = new AndroidAuthSession(appKeys);
+            mDBApi = new DropboxAPI<AndroidAuthSession>(session);
+            mDBApi.getSession().startOAuth2Authentication(MainActivity.this);
         }
 
     }
@@ -135,7 +132,6 @@ public class MainActivity extends Activity {
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.menu_main, menu);
         mMenuItemConnect = menu.getItem(0);
-        mMenuItemClearGraph = menu.getItem(1);
         return true;
     }
 
@@ -167,35 +163,46 @@ public class MainActivity extends Activity {
         super.onStart();
         mEnablingBT = false;
         GraphView graph1 = (GraphView) findViewById(R.id.graph1);
-        GraphView graph2 = (GraphView) findViewById(R.id.graph2);
-        GraphView graph3 = (GraphView) findViewById(R.id.graph3);
-        GraphView graph4 = (GraphView) findViewById(R.id.graph4);
+        //GraphView graph2 = (GraphView) findViewById(R.id.graph2);
+        //GraphView graph3 = (GraphView) findViewById(R.id.graph3);
+        //GraphView graph4 = (GraphView) findViewById(R.id.graph4);
         // data
         series1 = new LineGraphSeries<DataPoint>();
         series2 = new LineGraphSeries<DataPoint>();
         series3 = new LineGraphSeries<DataPoint>();
         series4 = new LineGraphSeries<DataPoint>();
-        graph1.removeAllSeries();graph1.addSeries(series1);
-        graph2.removeAllSeries();graph2.addSeries(series2);
-        graph3.removeAllSeries();graph3.addSeries(series3);
-        graph4.removeAllSeries();graph4.addSeries(series4);
+        graph1.removeAllSeries();
+        graph1.addSeries(series1);
+        graph1.addSeries(series2);
+        graph1.addSeries(series3);
+        graph1.addSeries(series4);
+
+        //graph2.removeAllSeries();graph2.addSeries(series2);
+        //graph3.removeAllSeries();graph3.addSeries(series3);
+        //graph4.removeAllSeries();graph4.addSeries(series4);
         // customize a little bit viewport
-        //series1.resetData(0);
         Viewport viewport1 = graph1.getViewport();viewport1.setYAxisBoundsManual(true);viewport1.setMinY(0);viewport1.setMaxY(3.5);viewport1.setScrollable(true);
-        Viewport viewport2 = graph2.getViewport();viewport2.setYAxisBoundsManual(true);viewport2.setMinY(0);viewport2.setMaxY(3.5);viewport2.setScrollable(true);
-        Viewport viewport3 = graph3.getViewport();viewport3.setYAxisBoundsManual(true);viewport3.setMinY(0);viewport3.setMaxY(3.5);viewport3.setScrollable(true);
-        Viewport viewport4 = graph4.getViewport();viewport4.setYAxisBoundsManual(true);viewport4.setMinY(0);viewport4.setMaxY(3.5);viewport4.setScrollable(true);
-        series1.setTitle("sensor1");graph1.getLegendRenderer().setVisible(true); graph1.getLegendRenderer().setAlign(LegendRenderer.LegendAlign.TOP);series1.setColor(Color.RED);
-        series2.setTitle("sensor2");graph2.getLegendRenderer().setVisible(true); graph2.getLegendRenderer().setAlign(LegendRenderer.LegendAlign.TOP);series2.setColor(Color.GREEN);
-        series3.setTitle("sensor3");graph3.getLegendRenderer().setVisible(true); graph3.getLegendRenderer().setAlign(LegendRenderer.LegendAlign.TOP);series3.setColor(Color.BLUE);
-        series4.setTitle("sensor4");graph4.getLegendRenderer().setVisible(true); graph4.getLegendRenderer().setAlign(LegendRenderer.LegendAlign.TOP);series4.setColor(Color.YELLOW);
+       // Viewport viewport2 = graph2.getViewport();viewport2.setYAxisBoundsManual(true);viewport2.setMinY(0);viewport2.setMaxY(3.5);viewport2.setScrollable(true);
+        //Viewport viewport3 = graph3.getViewport();viewport3.setYAxisBoundsManual(true);viewport3.setMinY(0);viewport3.setMaxY(3.5);viewport3.setScrollable(true);
+       // Viewport viewport4 = graph4.getViewport();viewport4.setYAxisBoundsManual(true);viewport4.setMinY(0);viewport4.setMaxY(3.5);viewport4.setScrollable(true);
+        series1.setTitle("sensor1");
+        series2.setTitle("sensor2");
+        series3.setTitle("sensor3");
+        series4.setTitle("sensor4");
+        graph1.getLegendRenderer().setVisible(true); graph1.getLegendRenderer().setAlign(LegendRenderer.LegendAlign.TOP);
+        series1.setColor(Color.RED);
+        series2.setColor(Color.GREEN);
+        series3.setColor(Color.BLUE);
+        series4.setColor(Color.YELLOW);
+        //series2.setTitle("sensor2");graph2.getLegendRenderer().setVisible(true); graph2.getLegendRenderer().setAlign(LegendRenderer.LegendAlign.TOP);series2.setColor(Color.GREEN);
+        //series3.setTitle("sensor3");graph3.getLegendRenderer().setVisible(true); graph3.getLegendRenderer().setAlign(LegendRenderer.LegendAlign.TOP);series3.setColor(Color.BLUE);
+        //series4.setTitle("sensor4");graph4.getLegendRenderer().setVisible(true); graph4.getLegendRenderer().setAlign(LegendRenderer.LegendAlign.TOP);series4.setColor(Color.YELLOW);
     }
     //==============================================================================
     @Override
     protected synchronized void onResume() {
         super.onResume();
         TextView ConnectionStat = (TextView) findViewById(R.id.ConnectionTextStat);
-        ImageView ConnectedImg = (ImageView) findViewById(R.id.ConnectionStatIcon);
         if(!mEnablingBT){
             if ( (mBluetoothAdapter != null)  && (!mBluetoothAdapter.isEnabled()) ) {
                 AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -225,10 +232,26 @@ public class MainActivity extends Activity {
             }
             if(getConnectionState() == BluetoothSerialService.STATE_CONNECTED){
                 ConnectionStat.setText("Connected To: "+ mConnectedDeviceName);
+                ConnectionStat.setTextColor(Color.GREEN);
             }else{
                 ConnectionStat.setText("Not Connected");
-                ConnectedImg.setVisibility(View.GONE);
+                ConnectionStat.setTextColor(Color.RED);
             }
+        }
+
+        if (isNetworkAvailable()){
+            if (mDBApi.getSession().authenticationSuccessful()) {
+                try {
+                    // Required to complete auth, sets the access token on the session
+                    mDBApi.getSession().finishAuthentication();
+
+                    String accessToken = mDBApi.getSession().getOAuth2AccessToken();
+                } catch (IllegalStateException e) {
+                    Log.i("DbAuthLog", "Error authenticating", e);
+                }
+            }
+        }else{
+            Log.e("DropBoxUpdate", "@auth-->No Internet Available!");
         }
     }
     //==============================================================================
@@ -292,20 +315,10 @@ public class MainActivity extends Activity {
     //==============================================================================
     //Handles:
     //==============================================================================
-    private Runnable updateDataThread = new Runnable() {
-        @Override
-        public void run() {
-     /* do what you need to do */
-            //appendDataToGraph();
-        }
-    };
-
-
         private final Handler mHandlerBT = new Handler() {
 
         @Override
         public void handleMessage(Message msg) {
-            ImageView ConnectedImg = (ImageView) findViewById(R.id.ConnectionStatIcon);
             TextView ConnectionStat = (TextView) findViewById(R.id.ConnectionTextStat);
             switch (msg.what) {
                 case MESSAGE_STATE_CHANGE:
@@ -331,7 +344,7 @@ public class MainActivity extends Activity {
                         if (!((message.equals("<S>")) || (message.equals("<E>")))){
                             message = message.replace(">", "");
                             message = message.replace("<", "");
-                            int data =Integer.parseInt(message);;
+                            int data =Integer.parseInt(message);
                             dataPacket.add(data);
                         }else if(message.equals("<S>")){
                             dataPacketCounter = 1;
@@ -364,6 +377,7 @@ public class MainActivity extends Activity {
                     // save the connected device's name
                     mConnectedDeviceName = msg.getData().getString(DEVICE_NAME);
                     ConnectionStat.setText("Connected To: "+ mConnectedDeviceName);
+                    ConnectionStat.setTextColor(Color.GREEN);
                     Toast.makeText(getApplicationContext(), "Connected to "+ mConnectedDeviceName, Toast.LENGTH_SHORT).show();
                     if (mMenuItemConnect != null) {
                         mMenuItemConnect.setTitle(R.string.disconnect);
@@ -377,9 +391,9 @@ public class MainActivity extends Activity {
 
                 case CONNECTION_LOST:
                     Toast.makeText(getApplicationContext(), "Device connection was lost",Toast.LENGTH_SHORT).show();
-                    ConnectedImg.setVisibility(View.GONE);
                     ConnectGreenIconVIS = false;
                     ConnectionStat.setText("Not connected");
+                    ConnectionStat.setTextColor(Color.RED);
                     if (mMenuItemConnect != null) {
                         mMenuItemConnect.setTitle(R.string.connect);
                     }
@@ -388,31 +402,13 @@ public class MainActivity extends Activity {
                 case UNABLE_TO_CONNECT:
                     ConnectGreenIconVIS = false;
                     ConnectionStat.setText("Not connected");
+                    ConnectionStat.setTextColor(Color.RED);
                     Toast.makeText(getApplicationContext(), "Unable to connect device",Toast.LENGTH_SHORT).show();
                     break;
 
             }
         }
     };
-
-    //==============================================================================
-    private Runnable runnable = new Runnable() {
-        @Override
-        public void run() {
-            ImageView ConnectedImg = (ImageView) findViewById(R.id.ConnectionStatIcon);
-            if (getConnectionState() == BluetoothSerialService.STATE_CONNECTED){
-                if (ConnectGreenIconVIS){
-                    ConnectedImg.setVisibility(View.GONE);
-                    ConnectGreenIconVIS = false;
-                }else{
-                    ConnectedImg.setVisibility(View.VISIBLE);
-                    ConnectGreenIconVIS = true;
-                }
-            }
-            handler.postDelayed(this, 500);
-        }
-    };
-
     //==============================================================================
     //User Methods:
     //==============================================================================
@@ -439,12 +435,42 @@ public class MainActivity extends Activity {
     //==============================================================================
     public void UpdateData(List<Integer> data) {
 
-        updateDataHandler.postDelayed(updateDataThread, 100);
         Calendar c = Calendar.getInstance();
         SimpleDateFormat sdf = new SimpleDateFormat("dd:MMMM:yyyy HH:mm:ss a");
         String strDate = sdf.format(c.getTime());
-        StoreDataToFile(DataFile,strDate+": "+"<"+ data.get(0)+">"+"<"+ data.get(1)+">"+"<"+ data.get(2)+">"+"<"+ data.get(3)+">"+"\u00b0C");
-        SampleCounter++;
+        StoreDataToFile(DataFile,strDate+": "+"<"+ data.get(0)+">"+"<"+ data.get(1)+">"+"<"+ data.get(2)+">"+"<"+ data.get(3)+">");
+        sampleCounter++;
+        if (sampleCounter >=numberOfSamples){
+            new Thread(new Runnable(){
+                @Override
+                public void run() {
+                    if (isNetworkAvailable()) {
+                        try {
+                            //Your implementation
+                            try {
+                                FileInputStream fis = null;
+                                fis = new FileInputStream(DataFile);
+                                try {
+                                    DropboxAPI.Entry newEntry = mDBApi.putFileOverwrite(DataFileName, fis, DataFile.length(), null);
+                                } catch (DropboxUnlinkedException e) {
+                                    Log.e("DbExampleLog", "User has unlinked.");
+                                } catch (DropboxException e) {
+                                    Log.e("DbExampleLog", "Something went wrong while uploading.");
+                                }
+                            } catch (FileNotFoundException e) {
+                                Log.e("DbExampleLog", "Could not find the file.");
+                            }
+
+                        } catch (Exception ex) {
+                            ex.printStackTrace();
+                        }
+                    }else{
+                    Log.e("DropBoxUpdate", "No Internet Available!");
+                    }
+                }
+            }).start();
+            sampleCounter = 0;
+        }
     }
     //==============================================================================
     public void StoreDataToFile (File MyFile, String data){
