@@ -494,6 +494,7 @@ public class MainActivity extends Activity {
             }
         }
     }
+    //
     //==============================================================================
     public void message(String message){
         Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
